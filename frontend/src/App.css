@@ -17,7 +17,6 @@
   }
 }
 
-
 .app-bg {
   min-height: 100vh;
   background: #181920;
@@ -33,7 +32,7 @@
   flex-direction: column;
   align-items: center;
   padding: 36px 0 0 0;
-  box-shadow: 2px 0 16px rgba(0,0,0,0.07);
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.07);
   min-height: 100vh;
 }
 .sidebar-title {
@@ -54,7 +53,9 @@
   font-size: 1.08rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.18s, color 0.18s;
+  transition:
+    background 0.18s,
+    color 0.18s;
 }
 .sidebar button.active,
 .sidebar button:hover {
@@ -71,43 +72,23 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 100vh;
+  height: 100%;
   box-sizing: border-box;
   margin: 0;
   max-width: none;
-}
-    position: absolute;
-  }
 
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
+  #center {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    place-content: center;
+    place-items: center;
+    flex-grow: 1;
 
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
-}
-
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
+    @media (max-width: 1024px) {
+      padding: 32px 20px 24px;
+      gap: 18px;
+    }
   }
 }
 
@@ -208,7 +189,7 @@
 
   &::before,
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     top: -4.5px;
     border: 5px solid transparent;
@@ -222,4 +203,105 @@
     right: 0;
     border-right-color: var(--border);
   }
+}
+
+.dashboard-section {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+  margin-top: 48px;
+}
+
+.dashboard-left {
+  min-width: 220px;
+  max-width: 300px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-left: 32px; /* Add space from sidebar */
+}
+
+.dashboard-main {
+  flex: 1 1 0;
+  padding-left: 48px;
+}
+
+.single-section {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 48px;
+  margin-top: 48px;
+}
+
+.clock-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #23242c;
+  padding: 48px 40px;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  min-width: 320px;
+  margin-bottom: 0;
+}
+
+.clock-time {
+  font-size: 2.8rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 40px;
+  letter-spacing: 1px;
+}
+
+.clock-in-btn,
+.clock-out-btn {
+  width: 200px;
+  height: 56px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  border-radius: 10px;
+  margin-bottom: 0;
+}
+
+.calendar-section {
+  background: #23242c;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  padding: 40px 32px;
+  min-width: 400px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 44px);
+  grid-gap: 12px;
+  margin-top: 24px;
+}
+
+.calendar-day {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-weight: 600;
+  color: #fff;
+  font-size: 1.2rem;
+}
+
+.calendar-day.present {
+  background: #22c55e;
+}
+.calendar-day.late {
+  background: #eab308;
+  color: #23242c;
+}
+.calendar-day.absent {
+  background: #ef4444;
 }

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "../../supabaseClient";
 
 export default function HRDashboard() {
   const [form, setForm] = useState({
@@ -20,57 +19,70 @@ export default function HRDashboard() {
     e.preventDefault();
     setLoading(true);
     setMessage("");
-    // Invite user via Supabase Auth
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: form.email,
-      email_confirm: true,
-    });
-    if (error) {
-      setMessage(error.message);
+    try {
+      const response = await fetch("http://localhost:4000/api/add-employee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const result = await response.json();
       setLoading(false);
-      return;
+      setMessage(result.error || result.message);
+      if (!result.error) {
+        setForm({
+          full_name: "",
+          email: "",
+          role: "employee",
+          leave_quota: 20,
+          shift_start: "09:00:00",
+        });
+      }
+    } catch (err) {
+      setLoading(false);
+      setMessage("An error occurred. Please try again.");
     }
-    // Insert into profiles
-    const { error: profileError } = await supabase.from("profiles").insert([
-      {
-        id: data.user.id,
-        full_name: form.full_name,
-        role: form.role,
-        leave_quota: form.leave_quota,
-        shift_start: form.shift_start,
-      },
-    ]);
-    setLoading(false);
-    if (profileError) setMessage(profileError.message);
-    else setMessage("Employee added and invited!");
-    setForm({
-      full_name: "",
-      email: "",
-      role: "employee",
-      leave_quota: 20,
-      shift_start: "09:00:00",
-    });
   };
 
   return (
     <div
       style={{
-        maxWidth: 400,
-        margin: "2rem auto",
-        padding: 24,
-        background: "#fff",
-        borderRadius: 8,
+        maxWidth: 420,
+        margin: "3rem auto",
+        padding: 32,
+        background: "#23242c",
+        borderRadius: 16,
+        boxShadow: "0 2px 16px rgba(0,0,0,0.10)",
+        color: "#fff",
       }}
     >
-      <h2>Add New Employee</h2>
-      <form onSubmit={handleSubmit}>
+      <h2
+        style={{
+          textAlign: "center",
+          fontWeight: 700,
+          fontSize: "2rem",
+          marginBottom: 24,
+        }}
+      >
+        Add New Employee
+      </h2>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: 16 }}
+      >
         <input
           name="full_name"
           value={form.full_name}
           onChange={handleChange}
           placeholder="Full Name"
           required
-          style={{ width: "100%", marginBottom: 8, padding: 8 }}
+          style={{
+            borderRadius: 8,
+            border: "none",
+            padding: 14,
+            fontSize: "1.1rem",
+            background: "#181920",
+            color: "#fff",
+          }}
         />
         <input
           name="email"
@@ -79,13 +91,27 @@ export default function HRDashboard() {
           onChange={handleChange}
           placeholder="Email"
           required
-          style={{ width: "100%", marginBottom: 8, padding: 8 }}
+          style={{
+            borderRadius: 8,
+            border: "none",
+            padding: 14,
+            fontSize: "1.1rem",
+            background: "#181920",
+            color: "#fff",
+          }}
         />
         <select
           name="role"
           value={form.role}
           onChange={handleChange}
-          style={{ width: "100%", marginBottom: 8, padding: 8 }}
+          style={{
+            borderRadius: 8,
+            border: "none",
+            padding: 14,
+            fontSize: "1.1rem",
+            background: "#181920",
+            color: "#fff",
+          }}
         >
           <option value="employee">Employee</option>
           <option value="hr">HR</option>
@@ -98,24 +124,60 @@ export default function HRDashboard() {
           onChange={handleChange}
           placeholder="Leave Quota"
           min={0}
-          style={{ width: "100%", marginBottom: 8, padding: 8 }}
+          style={{
+            borderRadius: 8,
+            border: "none",
+            padding: 14,
+            fontSize: "1.1rem",
+            background: "#181920",
+            color: "#fff",
+          }}
         />
         <input
           name="shift_start"
           type="time"
           value={form.shift_start}
           onChange={handleChange}
-          style={{ width: "100%", marginBottom: 8, padding: 8 }}
+          style={{
+            borderRadius: 8,
+            border: "none",
+            padding: 14,
+            fontSize: "1.1rem",
+            background: "#181920",
+            color: "#fff",
+          }}
         />
         <button
           type="submit"
           disabled={loading}
-          style={{ width: "100%", padding: 10 }}
+          style={{
+            borderRadius: 8,
+            border: "none",
+            padding: 16,
+            fontSize: "1.15rem",
+            fontWeight: 600,
+            background: loading ? "#888" : "#3b82f6",
+            color: "#fff",
+            cursor: loading ? "not-allowed" : "pointer",
+            marginTop: 8,
+            transition: "background 0.18s",
+          }}
         >
           {loading ? "Adding..." : "Add Employee"}
         </button>
       </form>
-      {message && <div style={{ marginTop: 12, color: "#333" }}>{message}</div>}
+      {message && (
+        <div
+          style={{
+            marginTop: 18,
+            color: message.includes("error") ? "#ef4444" : "#22c55e",
+            textAlign: "center",
+            fontWeight: 500,
+          }}
+        >
+          {message}
+        </div>
+      )}
     </div>
   );
 }

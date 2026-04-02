@@ -16,7 +16,7 @@ export default function UserInfo() {
       setUser(user);
       if (user) {
         const { data: profile, error: profileError } = await supabase
-          .from("profiles")
+          .from("employees")
           .select("full_name, role, leave_quota, shift_start")
           .eq("id", user.id)
           .single();
@@ -31,7 +31,6 @@ export default function UserInfo() {
   if (!user) return <div>Please log in to view your dashboard.</div>;
   return (
     <div className="user-info-card">
-      <h2>User Info</h2>
       <div>
         <b>Name:</b> {profile?.full_name || user.email}
       </div>
