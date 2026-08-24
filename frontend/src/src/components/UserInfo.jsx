@@ -11,11 +11,10 @@ export default function UserInfo() {
       setLoading(true);
       const {
         data: { user },
-        error: userError,
       } = await supabase.auth.getUser();
       setUser(user);
       if (user) {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from("employees")
           .select("full_name, role, leave_quota, shift_start")
           .eq("id", user.id)
@@ -27,25 +26,28 @@ export default function UserInfo() {
     getUserAndProfile();
   }, []);
 
-  if (loading) return <div>Loading user info...</div>;
-  if (!user) return <div>Please log in to view your dashboard.</div>;
+  if (loading) return <div className="user-info-card">Loading user info...</div>;
+  if (!user)
+    return (
+      <div className="user-info-card">Please log in to view your dashboard.</div>
+    );
+
+  const rows = [
+    ["Name", profile?.full_name || user.email],
+    ["Email", user.email],
+    ["Role", profile?.role || "employee"],
+    ["Leave quota", profile?.leave_quota ?? "-"],
+    ["Shift start", profile?.shift_start ?? "-"],
+  ];
+
   return (
-    <div className="user-info-card">
-      <div>
-        <b>Name:</b> {profile?.full_name || user.email}
-      </div>
-      <div>
-        <b>Email:</b> {user.email}
-      </div>
-      <div>
-        <b>Role:</b> {profile?.role || "employee"}
-      </div>
-      <div>
-        <b>Leave Quota:</b> {profile?.leave_quota ?? "-"}
-      </div>
-      <div>
-        <b>Shift Start:</b> {profile?.shift_start ?? "-"}
-      </div>
-    </div>
+    <dl className="user-info-card">
+      {rows.map(([label, value]) => (
+        <div className="user-info-row" key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

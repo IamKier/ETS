@@ -14,7 +14,7 @@ export default function ClockSection({ userId }) {
   useEffect(() => {
     const fetchClockStatus = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("attendance")
         .select("id")
         .eq("user_id", userId)

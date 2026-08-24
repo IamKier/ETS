@@ -1,15 +1,18 @@
 import { useState } from "react";
 
+const EMPTY_FORM = {
+  full_name: "",
+  email: "",
+  role: "employee",
+  leave_quota: 20,
+  shift_start: "09:00:00",
+};
+
 export default function HRDashboard() {
-  const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    role: "employee",
-    leave_quota: 20,
-    shift_start: "09:00:00",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -27,154 +30,89 @@ export default function HRDashboard() {
       });
       const result = await response.json();
       setLoading(false);
+      setIsError(Boolean(result.error));
       setMessage(result.error || result.message);
-      if (!result.error) {
-        setForm({
-          full_name: "",
-          email: "",
-          role: "employee",
-          leave_quota: 20,
-          shift_start: "09:00:00",
-        });
-      }
-    } catch (err) {
+      if (!result.error) setForm(EMPTY_FORM);
+    } catch {
       setLoading(false);
+      setIsError(true);
       setMessage("An error occurred. Please try again.");
     }
   };
 
   return (
-    <div
-      style={{
-        maxWidth: 420,
-        margin: "3rem auto",
-        padding: 32,
-        background: "#23242c",
-        borderRadius: 16,
-        boxShadow: "0 2px 16px rgba(0,0,0,0.10)",
-        color: "#fff",
-      }}
-    >
-      <h2
-        style={{
-          textAlign: "center",
-          fontWeight: 700,
-          fontSize: "2rem",
-          marginBottom: 24,
-        }}
-      >
-        Add New Employee
-      </h2>
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: 16 }}
-      >
-        <input
-          name="full_name"
-          value={form.full_name}
-          onChange={handleChange}
-          placeholder="Full Name"
-          required
-          style={{
-            borderRadius: 8,
-            border: "none",
-            padding: 14,
-            fontSize: "1.1rem",
-            background: "#181920",
-            color: "#fff",
-          }}
-        />
-        <input
-          name="email"
-          type="email"
-          value={form.email}
-          onChange={handleChange}
-          placeholder="Email"
-          required
-          style={{
-            borderRadius: 8,
-            border: "none",
-            padding: 14,
-            fontSize: "1.1rem",
-            background: "#181920",
-            color: "#fff",
-          }}
-        />
-        <select
-          name="role"
-          value={form.role}
-          onChange={handleChange}
-          style={{
-            borderRadius: 8,
-            border: "none",
-            padding: 14,
-            fontSize: "1.1rem",
-            background: "#181920",
-            color: "#fff",
-          }}
-        >
-          <option value="employee">Employee</option>
-          <option value="hr">HR</option>
-          <option value="admin">Admin</option>
-        </select>
-        <input
-          name="leave_quota"
-          type="number"
-          value={form.leave_quota}
-          onChange={handleChange}
-          placeholder="Leave Quota"
-          min={0}
-          style={{
-            borderRadius: 8,
-            border: "none",
-            padding: 14,
-            fontSize: "1.1rem",
-            background: "#181920",
-            color: "#fff",
-          }}
-        />
-        <input
-          name="shift_start"
-          type="time"
-          value={form.shift_start}
-          onChange={handleChange}
-          style={{
-            borderRadius: 8,
-            border: "none",
-            padding: 14,
-            fontSize: "1.1rem",
-            background: "#181920",
-            color: "#fff",
-          }}
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            borderRadius: 8,
-            border: "none",
-            padding: 16,
-            fontSize: "1.15rem",
-            fontWeight: 600,
-            background: loading ? "#888" : "#3b82f6",
-            color: "#fff",
-            cursor: loading ? "not-allowed" : "pointer",
-            marginTop: 8,
-            transition: "background 0.18s",
-          }}
-        >
+    <div className="panel">
+      <h2>Add New Employee</h2>
+      <form onSubmit={handleSubmit}>
+        <div className="field">
+          <label htmlFor="full_name">Full name</label>
+          <input
+            id="full_name"
+            name="full_name"
+            value={form.full_name}
+            onChange={handleChange}
+            placeholder="Jane Dela Cruz"
+            required
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            value={form.email}
+            onChange={handleChange}
+            placeholder="jane@company.com"
+            required
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="role">Role</label>
+          <select
+            id="role"
+            name="role"
+            value={form.role}
+            onChange={handleChange}
+          >
+            <option value="employee">Employee</option>
+            <option value="hr">HR</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="leave_quota">Leave quota (days)</label>
+          <input
+            id="leave_quota"
+            name="leave_quota"
+            type="number"
+            value={form.leave_quota}
+            onChange={handleChange}
+            min={0}
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="shift_start">Shift start</label>
+          <input
+            id="shift_start"
+            name="shift_start"
+            type="time"
+            value={form.shift_start}
+            onChange={handleChange}
+          />
+        </div>
+
+        <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? "Adding..." : "Add Employee"}
         </button>
       </form>
+
       {message && (
-        <div
-          style={{
-            marginTop: 18,
-            color: message.includes("error") ? "#ef4444" : "#22c55e",
-            textAlign: "center",
-            fontWeight: 500,
-          }}
-        >
+        <div className={`form-message ${isError ? "error" : "success"}`}>
           {message}
         </div>
       )}

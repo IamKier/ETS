@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import ClockInButton from "./src/components/ClockInButton";
-import ClockOutButton from "./src/components/ClockOutButton";
 import ClockSection from "./src/components/ClockSection";
 import CalendarSection from "./src/components/CalendarSection";
 import HRDashboard from "./src/pages/HRDashboard";
@@ -8,6 +6,7 @@ import UserPage from "./src/pages/UserPage";
 import LoginPage from "./src/pages/LoginPage";
 import { supabase } from "./supabaseClient";
 import "./App.css";
+
 function App() {
   const [page, setPage] = useState("dashboard");
   const [employeeView, setEmployeeView] = useState(false);
@@ -28,68 +27,39 @@ function App() {
   }, []);
 
   if (!session) {
-    return (
-      <LoginPage
-        onLogin={() => setSession(supabase.auth.getSession().data.session)}
-      />
-    );
+    return <LoginPage />;
   }
+
+  // Employee view hides the HR tab; drop back to the dashboard so toggling
+  // while on the HR page cannot leave the content area empty.
+  const toggleEmployeeView = () => {
+    setEmployeeView((v) => {
+      if (!v && page === "hr") setPage("dashboard");
+      return !v;
+    });
+  };
+
+  const navButton = (key, label) => (
+    <button
+      className={page === key ? "active" : ""}
+      onClick={() => setPage(key)}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div className="app-bg">
-      <div
-        className="sidebar"
-        style={{ display: "flex", flexDirection: "column", height: "100%" }}
-      >
-        <div>
-          <h1 className="sidebar-title">ETS</h1>
-          {employeeView ? (
-            <>
-              <button
-                className={page === "dashboard" ? "active" : ""}
-                onClick={() => setPage("dashboard")}
-              >
-                Main Dashboard
-              </button>
-              <button
-                className={page === "user" ? "active" : ""}
-                onClick={() => setPage("user")}
-              >
-                User Page
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                className={page === "dashboard" ? "active" : ""}
-                onClick={() => setPage("dashboard")}
-              >
-                Main Dashboard
-              </button>
-              <button
-                className={page === "user" ? "active" : ""}
-                onClick={() => setPage("user")}
-              >
-                User Page
-              </button>
-              <button
-                className={page === "hr" ? "active" : ""}
-                onClick={() => setPage("hr")}
-              >
-                HR Dashboard
-              </button>
-            </>
-          )}
-          <button
-            className="employee-view-toggle"
-            onClick={() => setEmployeeView((v) => !v)}
-          >
-            {employeeView ? "Exit Employee View" : "Employee View"}
-          </button>
-        </div>
+      <div className="sidebar">
+        <h1 className="sidebar-title">ETS</h1>
+        {navButton("dashboard", "Main Dashboard")}
+        {navButton("user", "User Page")}
+        {!employeeView && navButton("hr", "HR Dashboard")}
+        <button className="employee-view-toggle" onClick={toggleEmployeeView}>
+          {employeeView ? "Exit Employee View" : "Employee View"}
+        </button>
         <button
           className="logout-btn"
-          style={{ marginTop: "auto" }}
           onClick={async () => {
             await supabase.auth.signOut();
             setSession(null);
@@ -98,29 +68,16 @@ function App() {
           Logout
         </button>
       </div>
+
       <div className="main-content">
-        {employeeView ? (
-          <>
-            {page === "dashboard" && (
-              <div className="dashboard-section single-section">
-                <ClockSection userId={session.user.id} />
-                <CalendarSection userId={session.user.id} />
-              </div>
-            )}
-            {page === "user" && <UserPage />}
-          </>
-        ) : (
-          <>
-            {page === "dashboard" && (
-              <div className="dashboard-section single-section">
-                <ClockSection userId={session.user.id} />
-                <CalendarSection userId={session.user.id} />
-              </div>
-            )}
-            {page === "user" && <UserPage />}
-            {page === "hr" && <HRDashboard />}
-          </>
+        {page === "dashboard" && (
+          <div className="single-section">
+            <ClockSection userId={session.user.id} />
+            <CalendarSection userId={session.user.id} />
+          </div>
         )}
+        {page === "user" && <UserPage />}
+        {page === "hr" && !employeeView && <HRDashboard />}
       </div>
     </div>
   );
