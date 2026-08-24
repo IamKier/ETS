@@ -1,115 +1,178 @@
 import { useEffect, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 
-export default function ClockSection({ userId }) {
+const GRACE_MINUTES = 15;
+
+function formatClock(date) {
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function formatElapsed(ms) {
+  const mins = Math.floor(ms / 60000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+// "09:00:00" -> a Date today at 09:15, the point after which a clock-in
+// counts as late. Falls back to 09:00 when the profile has no shift.
+function lateThreshold(shiftStart) {
+  const [h, m] = (shiftStart || "09:00:00").split(":").map(Number);
+  const t = new Date();
+  t.setHours(h, (m || 0) + GRACE_MINUTES, 0, 0);
+  return t;
+}
+
+export default function ClockSection({ userId, shiftStart, onChange }) {
   const [time, setTime] = useState(new Date());
-  const [isClockedIn, setIsClockedIn] = useState(false);
+  const [openRow, setOpenRow] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   useEffect(() => {
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
+    const id = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
-    const fetchClockStatus = async () => {
+    if (!userId) return;
+    let cancelled = false;
+
+    const fetchOpen = async () => {
       setLoading(true);
       const { data } = await supabase
         .from("attendance")
-        .select("id")
+        .select("id, clock_in")
         .eq("user_id", userId)
         .is("clock_out", null)
         .order("clock_in", { ascending: false })
         .limit(1);
-      setIsClockedIn(data && data.length > 0);
+      if (cancelled) return;
+      setOpenRow(data?.[0] ?? null);
       setLoading(false);
     };
-    if (userId) fetchClockStatus();
+
+    fetchOpen();
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
-  const formatTime = (date) => {
-    let hours = date.getHours();
-    const minutes = date.getMinutes();
-    const seconds = date.getSeconds();
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    return (
-      `${hours.toString().padStart(2, "0")}:${minutes
-        .toString()
-        .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}` + ` ${ampm}`
-    );
-  };
-
   const handleClockIn = async () => {
+    setBusy(true);
+    setNotice(null);
     const now = new Date();
-    const threshold = new Date();
-    threshold.setHours(9, 15, 0);
+    const threshold = lateThreshold(shiftStart);
     const isLate = now > threshold;
     const lateMinutes = isLate ? Math.floor((now - threshold) / 60000) : 0;
-    const { error } = await supabase.from("attendance").insert([
-      {
-        user_id: userId,
-        clock_in: now.toISOString(),
-        is_late: isLate,
-        late_minutes: lateMinutes,
-        status: isLate ? "late" : "on-time",
-      },
-    ]);
+
+    const { data, error } = await supabase
+      .from("attendance")
+      .insert([
+        {
+          user_id: userId,
+          clock_in: now.toISOString(),
+          is_late: isLate,
+          late_minutes: lateMinutes,
+          status: isLate ? "late" : "on-time",
+        },
+      ])
+      .select("id, clock_in")
+      .single();
+
+    setBusy(false);
     if (error) {
-      alert("Error: " + error.message);
-    } else {
-      alert(
-        isLate
-          ? `Clocked in! You are ${lateMinutes} mins late.`
-          : "Clocked in on time!",
-      );
-      setIsClockedIn(true);
+      setNotice({ type: "error", text: error.message });
+      return;
     }
+    setOpenRow(data);
+    setNotice({
+      type: isLate ? "warn" : "success",
+      text: isLate
+        ? `Clocked in — ${lateMinutes} min late.`
+        : "Clocked in on time.",
+    });
+    onChange?.();
   };
 
   const handleClockOut = async () => {
-    const now = new Date();
-    const { data, error: fetchError } = await supabase
+    if (!openRow) return;
+    setBusy(true);
+    setNotice(null);
+
+    const { error } = await supabase
       .from("attendance")
-      .select("id")
-      .eq("user_id", userId)
-      .is("clock_out", null)
-      .order("clock_in", { ascending: false })
-      .limit(1);
-    if (fetchError || !data || data.length === 0) {
-      alert("No active clock-in found for clock out.");
+      .update({ clock_out: new Date().toISOString() })
+      .eq("id", openRow.id);
+
+    setBusy(false);
+    if (error) {
+      setNotice({ type: "error", text: error.message });
       return;
     }
-    const attendanceId = data[0].id;
-    const { error: updateError } = await supabase
-      .from("attendance")
-      .update({ clock_out: now.toISOString() })
-      .eq("id", attendanceId);
-    if (updateError) {
-      alert("Error: " + updateError.message);
-    } else {
-      alert("Clocked out successfully!");
-      setIsClockedIn(false);
-    }
+    const worked = formatElapsed(new Date() - new Date(openRow.clock_in));
+    setOpenRow(null);
+    setNotice({ type: "success", text: `Clocked out — ${worked} logged.` });
+    onChange?.();
   };
 
+  const clockedIn = Boolean(openRow);
+  const since = openRow ? new Date(openRow.clock_in) : null;
+
   return (
-    <div className="clock-section">
-      <div className="clock-time">{formatTime(time)}</div>
-      <div className="clock-buttons">
+    <section className="clock-section">
+      <div className="clock-time">{formatClock(time)}</div>
+
+      <div className={`clock-status${clockedIn ? " on" : ""}`}>
         {loading ? (
-          <div>Loading...</div>
-        ) : isClockedIn ? (
-          <button className="clock-out-btn" onClick={handleClockOut}>
-            Clock Out
-          </button>
+          "Checking status..."
+        ) : clockedIn ? (
+          <>
+            <span className="pulse-dot" aria-hidden="true" />
+            Since{" "}
+            {since.toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+            <span className="clock-elapsed">{formatElapsed(time - since)}</span>
+          </>
         ) : (
-          <button className="clock-in-btn" onClick={handleClockIn}>
-            Clock In
-          </button>
+          "Not clocked in"
         )}
       </div>
-    </div>
+
+      {!loading &&
+        (clockedIn ? (
+          <button
+            className="clock-out-btn"
+            onClick={handleClockOut}
+            disabled={busy}
+          >
+            {busy && <LoaderCircle size={16} className="spin" />}
+            {busy ? "Saving..." : "Clock Out"}
+          </button>
+        ) : (
+          <button
+            className="clock-in-btn"
+            onClick={handleClockIn}
+            disabled={busy}
+          >
+            {busy && <LoaderCircle size={16} className="spin" />}
+            {busy ? "Saving..." : "Clock In"}
+          </button>
+        ))}
+
+      {notice && (
+        <div className={`form-message ${notice.type}`} role="status">
+          {notice.text}
+        </div>
+      )}
+    </section>
   );
 }
