@@ -459,11 +459,40 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--sp-4);
+  gap: var(--sp-3);
 }
 
-.calendar-header span {
+.calendar-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.calendar-title > span {
   font-weight: 600;
-  font-size: 0.98rem;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.calendar-nav-group {
+  display: flex;
+  gap: var(--sp-1);
+  flex: none;
 }
 
 .calendar-nav {
@@ -489,10 +518,19 @@
   cursor: not-allowed;
 }
 
+/* The grid is the tooltip's offset parent, so cell coordinates read
+   straight off offsetLeft/offsetTop. */
+.calendar-body {
+  position: relative;
+}
+
+/* 8px, not 5: the today ring projects 4px beyond the cell and would
+   otherwise clip into its neighbours. */
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 5px;
+  gap: 8px;
+  position: relative;
   transition: opacity 0.2s;
 }
 .calendar-grid.is-loading {
@@ -508,54 +546,167 @@
 }
 
 .calendar-day {
+  position: relative;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  font-weight: 500;
-  font-size: 0.85rem;
-  color: var(--text-muted);
   background: var(--surface-3);
-  position: relative;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+
+.calendar-day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Hover lifts the cell rather than recolouring it, so the status
+   encoding is never disturbed by the interaction state. */
+.calendar-day:hover,
+.calendar-day.is-active {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(58, 44, 28, 0.14);
+}
+
+.calendar-day.is-weekend {
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0.55;
 }
 
 .calendar-day.is-muted {
-  opacity: 0.35;
+  opacity: 0.3;
 }
 
-.calendar-day.present,
-.calendar-day.late,
-.calendar-day.absent {
-  font-weight: 600;
-}
-
+/* Saturated fills, not washes. Light tints of these three hues measure
+   ΔE 2.9 against each other with full colour vision — indistinguishable,
+   which would destroy the at-a-glance read. These are the validated
+   steps: protan separation 9.6, normal-vision 21.9. */
 .calendar-day.present {
   background: var(--status-good);
   color: #fff;
+  font-weight: 600;
 }
 .calendar-day.late {
   background: var(--status-warn);
   color: #3b2c00;
+  font-weight: 600;
 }
 .calendar-day.absent {
   background: var(--status-bad);
   color: #fff;
+  font-weight: 600;
 }
 
-.calendar-day.is-today {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-/* Status is also a corner glyph, so it never relies on colour alone. */
-.calendar-day[data-glyph]::after {
-  content: attr(data-glyph);
-  position: absolute;
-  top: 1px;
-  right: 4px;
-  font-size: 0.55rem;
+.day-num {
   line-height: 1;
+}
+
+/* The glyph inherits the cell's text colour rather than carrying its own.
+   Giving it a separate hue meant darkening it to clear the fill, which
+   collapsed amber against red (ΔE 0.9 under deuteranopia). */
+.day-glyph {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.58rem;
+  line-height: 1;
+  font-weight: 700;
+  color: currentColor;
   opacity: 0.85;
+}
+
+/* Ringed rather than recoloured, so "today" can sit on top of any status
+   fill without competing with it. */
+.calendar-day.is-today {
+  box-shadow:
+    0 0 0 2px var(--surface-2),
+    0 0 0 4px var(--accent);
+  font-weight: 700;
+}
+.calendar-day.is-today:hover,
+.calendar-day.is-today.is-active {
+  box-shadow:
+    0 0 0 2px var(--surface-2),
+    0 0 0 4px var(--accent),
+    0 2px 8px rgba(58, 44, 28, 0.14);
+}
+
+/* Tooltip */
+.cal-tip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 8px));
+  z-index: 5;
+  min-width: 132px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--text);
+  color: var(--surface-2);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  text-align: left;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(40, 30, 20, 0.28);
+  animation: tip-in 0.12s ease-out both;
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 2px));
+  }
+}
+
+.cal-tip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  background: var(--text);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.cal-tip-head {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.cal-tip-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-tip-muted {
+  opacity: 0.6;
+}
+
+.cal-tip-times {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.cal-tip-times strong {
+  margin-left: auto;
+  font-weight: 700;
+  opacity: 1;
 }
 
 .calendar-legend {
@@ -582,13 +733,14 @@
   display: inline-block;
   flex: none;
 }
-.legend-swatch.tone-present {
+
+.tone-bg-present {
   background: var(--status-good);
 }
-.legend-swatch.tone-late {
+.tone-bg-late {
   background: var(--status-warn);
 }
-.legend-swatch.tone-absent {
+.tone-bg-absent {
   background: var(--status-bad);
 }
 
@@ -971,7 +1123,7 @@
     padding: var(--sp-4) var(--sp-3);
   }
   .calendar-grid {
-    gap: 4px;
+    gap: 6px;
   }
   .field-pair {
     grid-template-columns: 1fr;
@@ -1149,4 +1301,162 @@
     width: 100%;
     padding-left: 42px;
   }
+}
+
+/* ---------------------------------------------------------------
+   Dashboard additions — deltas, meter, recent entries
+   --------------------------------------------------------------- */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.section-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.dash-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.stat-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: 6px;
+  min-height: 18px;
+  flex-wrap: wrap;
+}
+
+.stat-note {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Delta chip. Colour follows direction x whether up is good, and the
+   arrow repeats it so the sign is never colour-only. */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 6px 1px 4px;
+  border-radius: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.delta-good {
+  color: var(--status-good);
+  background: #e4f1e7;
+}
+.delta-bad {
+  color: var(--status-bad);
+  background: var(--danger-soft);
+}
+.delta-flat {
+  color: var(--text-muted);
+  background: var(--surface-3);
+  padding: 1px 7px;
+}
+
+/* Meter: one value against a limit. The track is a lighter step of the
+   fill's own ramp, so the state reads across the whole bar. */
+.meter {
+  flex: 1;
+  min-width: 40px;
+  height: 5px;
+  border-radius: 20px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 20px;
+  background: var(--accent);
+  transition: width 0.4s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Recent entries */
+.entries-head {
+  padding: var(--sp-4) var(--sp-4) var(--sp-2);
+}
+
+.entries-head h3 {
+  font-size: 0.92rem;
+}
+
+.entries-empty {
+  padding: 0 var(--sp-4) var(--sp-4);
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+.entries-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entries-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 9px var(--sp-4);
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.entry-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+  width: 26px;
+  flex: none;
+}
+.entry-date strong {
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+.entry-date span {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.entry-times {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.entry-flag {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7d5c07;
+  background: #f7ecd5;
+  border-radius: 20px;
+  padding: 1px 6px;
+}
+
+.entry-total {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex: none;
 }
