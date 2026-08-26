@@ -1,4 +1,15 @@
 {
+  "name": "ets-backend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "ETS API — the one operation that needs the service role key",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "doctor": "node doctor.js",
+    "seed:passwords": "node seed-dev-passwords.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
     "dotenv": "^17.4.0",

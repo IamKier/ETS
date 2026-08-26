@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 
-const GRACE_MINUTES = 15;
+import { lateAfterMinutes } from "../lib/schedule";
+
+// Only used when no shift is assigned; the shift's own grace_minutes wins
+// wherever there is one.
+const FALLBACK_LATE_AFTER = 9 * 60 + 15;
 
 function formatClock(date) {
   return date.toLocaleTimeString(undefined, {
@@ -19,16 +23,17 @@ function formatElapsed(ms) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
-// "09:00:00" -> a Date today at 09:15, the point after which a clock-in
-// counts as late. Falls back to 09:00 when the profile has no shift.
-function lateThreshold(shiftStart) {
-  const [h, m] = (shiftStart || "09:00:00").split(":").map(Number);
+// The instant today after which a clock-in counts as late: the shift's
+// start plus its own grace period. The database applies the same rule when
+// HR approves a certificate of attendance.
+function lateThreshold(shift) {
+  const minutes = shift ? lateAfterMinutes(shift) : FALLBACK_LATE_AFTER;
   const t = new Date();
-  t.setHours(h, (m || 0) + GRACE_MINUTES, 0, 0);
+  t.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
   return t;
 }
 
-export default function ClockSection({ userId, shiftStart, onChange }) {
+export default function ClockSection({ userId, shift, onChange }) {
   const [time, setTime] = useState(new Date());
   const [openRow, setOpenRow] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -68,7 +73,7 @@ export default function ClockSection({ userId, shiftStart, onChange }) {
     setBusy(true);
     setNotice(null);
     const now = new Date();
-    const threshold = lateThreshold(shiftStart);
+    const threshold = lateThreshold(shift);
     const isLate = now > threshold;
     const lateMinutes = isLate ? Math.floor((now - threshold) / 60000) : 0;
 

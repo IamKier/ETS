@@ -454,6 +454,13 @@
   min-width: 0;
 }
 
+/* Minimal treatment: the grid carries no fills, borders or shadows of its
+   own. Everything that used to be a coloured cell is now a 6px mark, so
+   the month reads as numbers with a few marks under them rather than a
+   patchwork. The status hues keep their full saturation — see the note in
+   index.css; diluting them into tints is what collapses their separation
+   for red-weak viewers, so the area shrank instead of the chroma. */
+
 .calendar-header {
   display: flex;
   justify-content: space-between;
@@ -499,8 +506,8 @@
   display: grid;
   place-items: center;
   background: none;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border: none;
   border-radius: var(--radius-sm);
   width: 28px;
   height: 28px;
@@ -524,12 +531,13 @@
   position: relative;
 }
 
-/* 8px, not 5: the today ring projects 4px beyond the cell and would
-   otherwise clip into its neighbours. */
+/* 2px is enough now. Nothing projects beyond a cell any more — the today
+   marker is a disc inside it, not a ring around it — so the old 8px only
+   bought empty space. */
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+  gap: 2px;
   position: relative;
   transition: opacity 0.2s;
 }
@@ -541,28 +549,37 @@
   text-align: center;
   font-size: 0.68rem;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text-muted);
-  padding-bottom: var(--sp-1);
+  padding-bottom: var(--sp-3);
+}
+
+/* Dimmed to line up with the weekend cells below, so the two non-working
+   columns read as one band rather than headers over faded squares. */
+.calendar-weekday.is-weekend {
+  opacity: 0.55;
 }
 
 .calendar-day {
   position: relative;
   aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: none;
   border-radius: var(--radius-sm);
-  background: var(--surface-3);
+  background: none;
   color: var(--text-secondary);
   font: inherit;
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   padding: 0;
-  transition:
-    transform 0.12s,
-    box-shadow 0.12s;
+  transition: background 0.12s;
 }
 
 .calendar-day:focus-visible {
@@ -570,84 +587,127 @@
   outline-offset: 2px;
 }
 
-/* Hover lifts the cell rather than recolouring it, so the status
-   encoding is never disturbed by the interaction state. */
+/* A flat wash rather than a lift. It sits behind the mark instead of
+   under the whole cell, so the status encoding is untouched either way. */
 .calendar-day:hover,
 .calendar-day.is-active {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(58, 44, 28, 0.14);
+  background: var(--surface-3);
 }
 
 .calendar-day.is-weekend {
-  background: transparent;
   color: var(--text-muted);
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 .calendar-day.is-muted {
   opacity: 0.3;
 }
 
-/* Saturated fills, not washes. Light tints of these three hues measure
-   ΔE 2.9 against each other with full colour vision — indistinguishable,
-   which would destroy the at-a-glance read. These are the validated
-   steps: protan separation 9.6, normal-vision 21.9. */
-.calendar-day.present {
-  background: var(--status-good);
-  color: #fff;
-  font-weight: 600;
-}
-.calendar-day.late {
-  background: var(--status-warn);
-  color: #3b2c00;
-  font-weight: 600;
-}
-.calendar-day.absent {
-  background: var(--status-bad);
-  color: #fff;
-  font-weight: 600;
-}
-
 .day-num {
   line-height: 1;
 }
 
-/* The glyph inherits the cell's text colour rather than carrying its own.
-   Giving it a separate hue meant darkening it to clear the fill, which
-   collapsed amber against red (ΔE 0.9 under deuteranopia). */
-.day-glyph {
-  position: absolute;
-  top: 2px;
-  right: 4px;
-  font-size: 0.58rem;
-  line-height: 1;
-  font-weight: 700;
-  color: currentColor;
-  opacity: 0.85;
+/* The mark slot is always present so every number sits on the same
+   baseline; only the modifier classes below paint anything. */
+.day-mark {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: none;
 }
 
-/* Ringed rather than recoloured, so "today" can sit on top of any status
-   fill without competing with it. */
-.calendar-day.is-today {
-  box-shadow:
-    0 0 0 2px var(--surface-2),
-    0 0 0 4px var(--accent);
-  font-weight: 700;
+/* Disc, ring, bar. The shape is the redundant channel the corner glyph
+   used to provide — it survives greyscale and any colour deficiency, which
+   is what permits the cell behind it to stay empty. */
+.mark-present {
+  background: var(--status-good);
 }
-.calendar-day.is-today:hover,
-.calendar-day.is-today.is-active {
-  box-shadow:
-    0 0 0 2px var(--surface-2),
-    0 0 0 4px var(--accent),
-    0 2px 8px rgba(58, 44, 28, 0.14);
+/* Wider than the disc on purpose: box-sizing is border-box app-wide, so
+   at 6px the 1.5px border would leave a 3px hole — a ring that reads as a
+   slightly soft dot. 8px leaves 5px of clear centre. */
+.mark-late {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--status-warn);
+}
+.mark-absent {
+  width: 7px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--status-bad);
+}
+
+/* Diamond, in muted grey rather than a status hue. Leave is not a
+   performance state — colouring it green would read as credit and red as
+   fault, and it is neither. The rotation is what keeps it distinct from
+   the disc at this size. */
+.mark-leave {
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--text-muted);
+  transform: rotate(45deg);
+}
+
+.cal-tip-status .mark-leave {
+  transform: rotate(45deg) scale(1.15);
+}
+
+/* Official business is worked time, so it takes the same green as a
+   present day — but hollow, because it was credited rather than clocked.
+   Same hue, different fill: related states, still distinguishable. */
+.mark-ob {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--status-good);
+  background: none;
+}
+
+.cal-tip-status .mark-ob {
+  transform: scale(1.15);
+}
+
+/* Holiday: an outlined diamond, matching leave's shape family because
+   both mean "not expected in", but hollow so the two stay apart at a
+   glance. Neutral again — a holiday is nobody's performance. */
+.mark-holiday {
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  border: 1.5px solid var(--text-muted);
+  background: none;
+  transform: rotate(45deg);
+}
+
+.cal-tip-status .mark-holiday {
+  transform: rotate(45deg) scale(1.15);
+}
+
+/* Today is the one place colour is spent on a whole element, and it is
+   the accent rather than a status hue — so it cannot be confused with a
+   record. The disc is drawn on the number only, leaving the mark below it
+   free to show that day's status as usual. */
+.calendar-day.is-today .day-num {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -6px 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--text-inverse);
+  font-weight: 600;
 }
 
 /* Tooltip */
 .cal-tip {
   position: absolute;
-  transform: translate(-50%, calc(-100% - 8px));
+  transform: translate(-50%, -100%);
   z-index: 5;
-  min-width: 132px;
+  /* Fixed, not min-width: the edge-column clamp in CalendarSection.jsx
+     needs a number it can trust. TIP_WIDTH there mirrors this. */
+  width: 168px;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   background: var(--text);
@@ -656,26 +716,45 @@
   line-height: 1.45;
   text-align: left;
   pointer-events: none;
-  box-shadow: 0 6px 20px rgba(40, 30, 20, 0.28);
+  box-shadow: 0 4px 14px rgba(40, 30, 20, 0.18);
   animation: tip-in 0.12s ease-out both;
+}
+
+.cal-tip.is-below {
+  transform: translate(-50%, 0);
+  animation-name: tip-in-below;
 }
 
 @keyframes tip-in {
   from {
     opacity: 0;
-    transform: translate(-50%, calc(-100% - 2px));
+    transform: translate(-50%, calc(-100% + 6px));
   }
 }
 
+@keyframes tip-in-below {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+/* --arrow is the distance the tooltip was clamped away from its cell.
+   Adding it back here keeps the arrow over the day it describes. */
 .cal-tip::after {
   content: "";
   position: absolute;
-  left: 50%;
+  left: calc(50% + var(--arrow, 0px));
   bottom: -4px;
   width: 8px;
   height: 8px;
   background: var(--text);
   transform: translateX(-50%) rotate(45deg);
+}
+
+.cal-tip.is-below::after {
+  bottom: auto;
+  top: -4px;
 }
 
 .cal-tip-head {
@@ -686,7 +765,13 @@
 .cal-tip-status {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+}
+
+/* On the dark tooltip the ring and bar would otherwise sit on their own
+   against a near-black field; a touch of size keeps them legible there. */
+.cal-tip-status .day-mark {
+  transform: scale(1.15);
 }
 
 .cal-tip-muted {
@@ -712,10 +797,9 @@
 .calendar-legend {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--sp-4);
-  margin-top: var(--sp-4);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border);
+  margin-top: var(--sp-5);
   font-size: 0.76rem;
   color: var(--text-muted);
 }
@@ -726,23 +810,29 @@
   gap: 6px;
 }
 
-.legend-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  display: inline-block;
-  flex: none;
+/* A zero still shows — an empty category is a real answer, and hiding it
+   would make the row change shape between months. */
+.calendar-legend span.is-empty {
+  opacity: 0.45;
 }
 
-.tone-bg-present {
-  background: var(--status-good);
+.legend-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
 }
-.tone-bg-late {
-  background: var(--status-warn);
+
+.calendar-legend span.is-empty .legend-count {
+  color: var(--text-muted);
 }
-.tone-bg-absent {
-  background: var(--status-bad);
+
+.legend-note {
+  margin-left: auto;
+  font-style: italic;
 }
+
+/* Legend and grid share the mark classes outright, so the legend cannot
+   drift out of sync with what the cells actually draw. */
 
 /* ---------------------------------------------------------------
    Detail list (profile)
@@ -792,10 +882,18 @@
   text-align: left;
 }
 
+/* minmax(0, 1fr), not 1fr: a bare 1fr track still takes an automatic
+   minimum from its content, and date and time inputs carry a wide
+   intrinsic minimum that a percentage width cannot override. That is what
+   pushed the second field out through the side of the modal. */
 .field-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--sp-3);
+}
+
+.field-pair > .field {
+  min-width: 0;
 }
 
 .field label {
@@ -807,6 +905,8 @@
 .field input,
 .field select {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
@@ -1123,7 +1223,7 @@
     padding: var(--sp-4) var(--sp-3);
   }
   .calendar-grid {
-    gap: 6px;
+    gap: 1px;
   }
   .field-pair {
     grid-template-columns: 1fr;
@@ -1459,4 +1559,817 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   flex: none;
+}
+
+/* ---------------------------------------------------------------
+   Dev account picker
+   Only rendered when import.meta.env.DEV and VITE_DEV_PASSWORD are
+   both set, so none of this reaches a production build.
+   --------------------------------------------------------------- */
+.dev-accounts {
+  display: grid;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.dev-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.dev-account:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+
+.dev-account:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dev-account-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.dev-account-role {
+  flex: 0 0 auto;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+
+/* ---------------------------------------------------------------
+   Leave, approvals and corrections
+   --------------------------------------------------------------- */
+
+/* Balance tiles. Deliberately flatter than .stat-tile — these are a
+   reference figure someone checks before filing, not the month's
+   headline numbers. */
+.balance-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+}
+
+.balance-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.balance-tile.is-quiet {
+  background: none;
+  border-style: dashed;
+}
+
+.balance-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-label {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+/* Shared by both queues and by the employee's own list. */
+.request-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.request-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+.request-list li:first-child {
+  border-top: none;
+}
+
+.request-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.request-range {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.request-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.request-note {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.request-actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex: none;
+}
+
+.btn-approve,
+.btn-reject {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px var(--sp-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: none;
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.btn-approve {
+  color: var(--success);
+}
+.btn-approve:hover:not(:disabled) {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--text-inverse);
+}
+
+.btn-reject {
+  color: var(--danger);
+}
+.btn-reject:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-inverse);
+}
+
+.btn-approve:disabled,
+.btn-reject:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Status pills. Each pairs its tint with the written status, so none of
+   these carry meaning in colour alone. */
+.pill {
+  flex: none;
+  padding: 3px var(--sp-2);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.pill-pending {
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+.pill-approved {
+  background: #e3f1e6;
+  color: #14622b;
+}
+.pill-rejected {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.pill-cancelled {
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+/* Tabs */
+.tab-row {
+  display: flex;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: 0.87rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+.tab-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-inverse);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Correction affordance in the entries list — kept quiet until hover so
+   it does not compete with the times, which are what the list is for. */
+.entry-fix {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+
+.entries-list li:hover .entry-fix,
+.entry-fix:focus-visible {
+  opacity: 1;
+}
+
+.entry-fix:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* Touch has no hover, so the control would never appear. */
+@media (hover: none) {
+  .entry-fix {
+    opacity: 1;
+  }
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+  background: rgba(40, 30, 20, 0.38);
+  animation: fade-in 0.12s ease-out both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.modal {
+  width: 100%;
+  max-width: 420px;
+  /* The OB form is tall enough to run past the bottom of a short laptop
+     screen, and the backdrop is fixed — without this the submit button is
+     simply unreachable. */
+  max-height: calc(100vh - var(--sp-6));
+  overflow-y: auto;
+  padding: var(--sp-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-float);
+}
+
+/* The last field before the actions carries the form's bottom margin
+   already; doubling it just pushes the buttons further off screen. */
+.modal form > .field:last-of-type {
+  margin-bottom: var(--sp-3);
+}
+
+.modal h3 {
+  margin: 0 0 var(--sp-1);
+  font-size: 1.05rem;
+}
+
+.modal-sub {
+  margin: 0 0 var(--sp-4);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+.modal-actions .btn-primary {
+  width: auto;
+  margin: 0;
+}
+
+.btn-ghost {
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.87rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* An inline button in a page header should not stretch like the full-width
+   form submit .btn-primary is normally used for. */
+.btn-inline {
+  width: auto;
+  margin: 0;
+  flex: none;
+}
+
+.card-pad-head {
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+}
+
+.form-hint {
+  margin: calc(var(--sp-2) * -1) 0 var(--sp-4);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.form-hint.is-warn {
+  color: var(--danger);
+}
+
+@media (max-width: 940px) {
+  .balance-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .request-list li {
+    flex-wrap: wrap;
+  }
+  .request-actions {
+    width: 100%;
+  }
+  .btn-approve,
+  .btn-reject {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+
+/* ---------------------------------------------------------------
+   Request hub
+   --------------------------------------------------------------- */
+
+/* Four entry points, given equal weight — none of the four types is the
+   default one, and burying three behind a dropdown would say otherwise. */
+.filing-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+}
+
+.filing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.filing-card:hover {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+
+.filing-card svg {
+  color: var(--accent);
+  margin-bottom: var(--sp-1);
+}
+
+.filing-label {
+  font-size: 0.87rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.filing-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Type tag on each row of the hub list. Monospaced so LEAVE, OB, OT and
+   COA line up in a column instead of ragging. */
+.kind-tag {
+  flex: none;
+  width: 44px;
+  padding: 3px 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.kind-leave {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* A tile the employee has to act on, rather than one that just reports.
+   The accent border is the only thing separating them. */
+.balance-tile.is-action {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pill-confirmed {
+  background: #e3f1e6;
+  color: #14622b;
+}
+
+@media (max-width: 940px) {
+  .filing-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
+/* ---------------------------------------------------------------
+   Schedule
+   --------------------------------------------------------------- */
+
+/* The one line someone opens this page to read, so it sits above
+   everything else and says either "you are in today" or "you are not". */
+.schedule-today {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.schedule-today svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.shift-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+
+.shift-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.shift-name svg {
+  color: var(--text-muted);
+}
+
+.shift-range {
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.shift-note {
+  margin: 0 0 var(--sp-3);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Seven columns, always — the shape of the week is the point, so it does
+   not reflow to fewer even on a narrow screen. */
+.week-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+}
+
+.week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  text-align: center;
+}
+
+/* Rest days are drawn as absence of content rather than a colour: dashed
+   and dimmed, so the working week reads as the solid blocks. */
+.week-day.is-rest {
+  background: none;
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.week-day.is-today {
+  border-color: var(--accent);
+  border-style: solid;
+}
+
+.week-day-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.week-day-state {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.week-day.is-rest .week-day-state {
+  font-style: italic;
+}
+
+/* Same block as an entry date, so a holiday row and an attendance row
+   scan the same way. */
+.holiday-date {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 34px;
+  line-height: 1.1;
+}
+
+.holiday-date strong {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.holiday-date span {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.page-foot {
+  margin-top: var(--sp-5);
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* Visible to screen readers only. The week grid shows two letters, which
+   is not a day name. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+
+/* ---------------------------------------------------------------
+   Scheduling (HR)
+   --------------------------------------------------------------- */
+.roster-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.roster-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+.roster-list li:first-child {
+  border-top: none;
+}
+
+.roster-who {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.roster-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.roster-shift {
+  flex: none;
+}
+
+.roster-shift select {
+  width: auto;
+  min-width: 180px;
+  padding: 6px var(--sp-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+/* Seven toggles rather than a multi-select: the whole week has to be
+   visible at once, because the question is always "which days is this
+   person off" and not "is Tuesday selected". */
+.rest-picker {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.rest-day {
+  width: 30px;
+  padding: 5px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+
+.rest-day:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+/* Rest days are the marked state — they are the exception being recorded,
+   and there are fewer of them than working days. */
+.rest-day.is-rest {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.rest-day:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Fixed width so a row does not jump sideways when the tick appears. */
+.roster-state {
+  flex: none;
+  width: 62px;
+  display: flex;
+  justify-content: flex-end;
+  color: var(--text-muted);
+}
+
+.saved-flash {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.74rem;
+  color: var(--success);
+  animation: fade-in 0.15s ease-out both;
+}
+
+.shift-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.request-list li.is-off {
+  opacity: 0.55;
+}
+
+.year-nav {
+  display: flex;
+  gap: var(--sp-3);
+}
+
+/* The delete control on holidays is always visible — unlike the entries
+   list there is no row-level hover affordance to discover it from. */
+.entry-fix.is-always {
+  opacity: 1;
+}
+
+@media (max-width: 940px) {
+  .roster-list li {
+    flex-wrap: wrap;
+  }
+  .roster-shift select {
+    min-width: 0;
+    width: 100%;
+  }
+  .roster-shift {
+    flex: 1 1 100%;
+  }
 }

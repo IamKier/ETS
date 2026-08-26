@@ -4,6 +4,8 @@ import ClockSection from "../components/ClockSection";
 import CalendarSection from "../components/CalendarSection";
 import StatRow from "../components/StatRow";
 import RecentEntries from "../components/RecentEntries";
+import { spanByDay, toISODate } from "../lib/requests";
+import { DEFAULT_SCHEDULE, makeSchedule, shiftMinutes } from "../lib/schedule";
 
 const HOURS_PER_DAY = 8;
 
@@ -20,7 +22,16 @@ function startOfDay(d) {
 // Rolls one month's rows into the numbers the tiles show. Kept as a plain
 // function so the same code produces the current month and the one before
 // it, which is what the deltas compare against.
-function summarise(rows, year, month, empStart) {
+function summarise(
+  rows,
+  year,
+  month,
+  empStart,
+  leaveDays = {},
+  obDays = {},
+  schedule = DEFAULT_SCHEDULE,
+  dayMinutes = HOURS_PER_DAY * 60,
+) {
   let onTime = 0;
   let late = 0;
   let lateMinutes = 0;
@@ -38,21 +49,51 @@ function summarise(rows, year, month, empStart) {
     }
   });
 
-  // Absent = a past weekday in this month, on or after the employee's start
-  // date, with no attendance row. Weekends never count. `expected` counts
-  // the same set of days, which is what the hours target is measured against.
+  // Absent = a past working day in this month, on or after the employee's
+  // start date, with no attendance row and no approved leave. Rest days and
+  // holidays never count — which days those are is the employee's own
+  // schedule, not a fixed Sat/Sun. `expected` counts the same set of days,
+  // which is what the hours target is measured against.
   const today = startOfDay(new Date());
   const lastDay = new Date(year, month + 1, 0).getDate();
   let absent = 0;
   let workdays = 0;
+  let onLeave = 0;
+  let onOB = 0;
+  let holidays = 0;
 
   for (let d = 1; d <= lastDay; d++) {
     const date = new Date(year, month, d);
     if (date >= today) break;
-    const isWeekday = date.getDay() !== 0 && date.getDay() !== 6;
     const started = !empStart || date >= empStart;
-    if (!isWeekday || !started) continue;
+    if (!started) continue;
+    // Counted separately so the month summary can say why a day was not
+    // expected, rather than silently shrinking the total.
+    if (schedule.isHoliday(date) && !schedule.isRestDay(date)) {
+      holidays += 1;
+      continue;
+    }
+    if (!schedule.isWorkingDay(date)) continue;
+
+    // Approved leave was neither worked nor missed. It comes out of the
+    // expected total rather than counting as an absence — otherwise taking
+    // the holiday you are owed damages your own attendance record.
+    if (leaveDays[d] && !byDay[d]) {
+      onLeave += 1;
+      continue;
+    }
+
     workdays += 1;
+
+    // Official business is worked time with no clock behind it. It stays
+    // in the expected total and is credited a standard day, so an OB week
+    // reads as worked rather than as a hole in the hours meter.
+    if (obDays[d] && !byDay[d]) {
+      onOB += 1;
+      minutes += dayMinutes;
+      continue;
+    }
+
     if (!byDay[d]) absent += 1;
   }
 
@@ -61,9 +102,12 @@ function summarise(rows, year, month, empStart) {
     late,
     lateMinutes,
     absent,
+    onLeave,
+    onOB,
+    holidays,
     workdays,
     hours: minutes / 60,
-    expected: workdays * HOURS_PER_DAY,
+    expected: (workdays * dayMinutes) / 60,
     byDay,
   };
 }
@@ -71,6 +115,10 @@ function summarise(rows, year, month, empStart) {
 export default function DashboardPage({ userId, profile }) {
   const now = new Date();
   const [rows, setRows] = useState([]);
+  const [leave, setLeave] = useState([]);
+  const [ob, setOb] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+  const [shift, setShift] = useState(null);
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [loading, setLoading] = useState(true);
@@ -91,16 +139,52 @@ export default function DashboardPage({ userId, profile }) {
       const from = new Date(year, month - 1, 1);
       const to = new Date(year, month + 1, 0, 23, 59, 59);
 
-      const { data } = await supabase
-        .from("attendance")
-        .select("clock_in, clock_out, status, late_minutes")
-        .eq("user_id", userId)
-        .gte("clock_in", from.toISOString())
-        .lte("clock_in", to.toISOString())
-        .order("clock_in", { ascending: true });
+      const [attendance, leaveRes, obRes, holidayRes, shiftRes] = await Promise.all([
+        supabase
+          .from("attendance")
+          .select("id, clock_in, clock_out, status, late_minutes")
+          .eq("user_id", userId)
+          .gte("clock_in", from.toISOString())
+          .lte("clock_in", to.toISOString())
+          .order("clock_in", { ascending: true }),
+        // Overlap, not containment: a request that starts in the previous
+        // month and ends in this one has to colour days in both.
+        supabase
+          .from("leave_requests")
+          .select("id, type, start_date, end_date, reason")
+          .eq("user_id", userId)
+          .eq("status", "approved")
+          .lte("start_date", toISODate(to))
+          .gte("end_date", toISODate(from)),
+        supabase
+          .from("ob_requests")
+          .select("id, start_date, end_date, destination, purpose")
+          .eq("user_id", userId)
+          .eq("status", "approved")
+          .lte("start_date", toISODate(to))
+          .gte("end_date", toISODate(from)),
+        // Holidays are read for the whole window, not just the visible
+        // month, because the previous month feeds the deltas.
+        supabase
+          .from("holidays")
+          .select("date, name, type")
+          .gte("date", toISODate(from))
+          .lte("date", toISODate(to)),
+        profile?.shift_id
+          ? supabase
+              .from("shifts")
+              .select("name, start_time, end_time, break_minutes, grace_minutes")
+              .eq("id", profile.shift_id)
+              .single()
+          : Promise.resolve({ data: null }),
+      ]);
 
       if (cancelled) return;
-      setRows(data ?? []);
+      setRows(attendance.data ?? []);
+      setLeave(leaveRes.data ?? []);
+      setOb(obRes.data ?? []);
+      setHolidays(holidayRes.data ?? []);
+      setShift(shiftRes.data ?? null);
       setLoading(false);
     };
 
@@ -108,7 +192,7 @@ export default function DashboardPage({ userId, profile }) {
     return () => {
       cancelled = true;
     };
-  }, [userId, year, month, tick]);
+  }, [userId, year, month, tick, profile?.shift_id]);
 
   // Memoised so the identity is stable — a fresh Date every render would
   // re-run the summaries on every tick of the clock. The dependency is a
@@ -119,27 +203,68 @@ export default function DashboardPage({ userId, profile }) {
     [startDate],
   );
 
+  const restDays = profile?.rest_days;
+  const schedule = useMemo(
+    () => makeSchedule({ restDays, holidays }),
+    [restDays, holidays],
+  );
+
+  // A shift's paid span, break excluded. Falls back to the flat eight hour
+  // day for anyone not yet assigned one.
+  const dayMinutes = shift ? shiftMinutes(shift) : HOURS_PER_DAY * 60;
+
+  const monthLeave = useMemo(
+    () => spanByDay(leave, year, month, schedule),
+    [leave, year, month, schedule],
+  );
+
+  const monthOB = useMemo(
+    () => spanByDay(ob, year, month, schedule),
+    [ob, year, month, schedule],
+  );
+
   const { current, previous } = useMemo(() => {
     const inMonth = (r, y, m) => {
       const d = new Date(r.clock_in);
       return d.getFullYear() === y && d.getMonth() === m;
     };
     const prev = new Date(year, month - 1, 1);
+    const prevLeave = spanByDay(leave, prev.getFullYear(), prev.getMonth(), schedule);
+    const prevOB = spanByDay(ob, prev.getFullYear(), prev.getMonth(), schedule);
     return {
       current: summarise(
         rows.filter((r) => inMonth(r, year, month)),
         year,
         month,
         empStart,
+        monthLeave,
+        monthOB,
+        schedule,
+        dayMinutes,
       ),
       previous: summarise(
         rows.filter((r) => inMonth(r, prev.getFullYear(), prev.getMonth())),
         prev.getFullYear(),
         prev.getMonth(),
         empStart,
+        prevLeave,
+        prevOB,
+        schedule,
+        dayMinutes,
       ),
     };
-  }, [rows, year, month, empStart]);
+  }, [
+    rows,
+    leave,
+    ob,
+    monthLeave,
+    monthOB,
+    year,
+    month,
+    empStart,
+    schedule,
+    dayMinutes,
+  ]);
 
   const monthRows = useMemo(
     () =>
@@ -208,6 +333,10 @@ export default function DashboardPage({ userId, profile }) {
           <span className="section-note">
             {current.workdays} working {current.workdays === 1 ? "day" : "days"}{" "}
             so far
+            {current.onLeave > 0 && `, ${current.onLeave} on leave`}
+            {current.onOB > 0 && `, ${current.onOB} on OB`}
+            {current.holidays > 0 &&
+              `, ${current.holidays} ${current.holidays === 1 ? "holiday" : "holidays"}`}
           </span>
         )}
       </div>
@@ -223,15 +352,23 @@ export default function DashboardPage({ userId, profile }) {
         <div className="dash-col">
           <ClockSection
             userId={userId}
-            shiftStart={profile?.shift_start}
+            shift={shift}
             onChange={refresh}
           />
-          <RecentEntries rows={monthRows} loading={loading} />
+          <RecentEntries
+            rows={monthRows}
+            loading={loading}
+            userId={userId}
+            onChange={refresh}
+          />
         </div>
         <CalendarSection
           year={year}
           month={month}
           byDay={current.byDay}
+          leaveByDay={monthLeave}
+          obByDay={monthOB}
+          schedule={schedule}
           empStart={empStart}
           canGoPrev={canGoPrev}
           onPrev={goPrev}
