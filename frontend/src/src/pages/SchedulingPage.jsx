@@ -56,6 +56,8 @@ export default function SchedulingPage() {
   const [newShift, setNewShift] = useState(EMPTY_SHIFT);
   const [newHoliday, setNewHoliday] = useState(EMPTY_HOLIDAY);
 
+  const [setupNeeded, setSetupNeeded] = useState(false);
+
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
@@ -79,7 +81,18 @@ export default function SchedulingPage() {
 
       if (cancelled) return;
       const err = [teamRes, shiftRes, holidayRes].find((r) => r.error)?.error;
-      setNotice(err ? { type: "error", text: err.message } : null);
+
+      // 42703 is an unknown column, PGRST205 an unknown table. Both mean
+      // the same thing here: schedule.sql has not been run. There is no
+      // useful degraded mode — assigning shifts and rest days is the whole
+      // job of this page — so say what is missing instead of forwarding a
+      // Postgres error nobody can act on.
+      setSetupNeeded(err?.code === "42703" || err?.code === "PGRST205");
+      setNotice(
+        err && err.code !== "42703" && err.code !== "PGRST205"
+          ? { type: "error", text: err.message }
+          : null,
+      );
       setTeam(teamRes.data ?? []);
       setShifts(shiftRes.data ?? []);
       setHolidays(holidayRes.data ?? []);
@@ -211,8 +224,50 @@ export default function SchedulingPage() {
 
   const unassigned = team.filter((e) => !e.shift_id).length;
 
+  // Nothing on this page works without the schedule schema, so it takes
+  // over the whole view rather than sitting above three empty tabs.
+  if (setupNeeded) {
+    return (
+      <div className="page">
+        <header className="page-head">
+          <h1>Scheduling</h1>
+          <p className="page-sub">Not set up yet</p>
+        </header>
+        <div className="card card-pad setup-notice">
+          <h2>One migration still to run</h2>
+          <p>
+            Scheduling needs the <code>shifts</code> and <code>holidays</code>{" "}
+            tables, plus <code>shift_id</code> and <code>rest_days</code> on{" "}
+            <code>employees</code>. None of them exist yet.
+          </p>
+          <ol>
+            <li>
+              Open your Supabase dashboard → <strong>SQL Editor</strong> →{" "}
+              <strong>New query</strong>.
+            </li>
+            <li>
+              Paste the contents of <code>supabase/schedule.sql</code> and run
+              it. It is safe to re-run.
+            </li>
+            <li>
+              Come back and press <strong>Retry</strong>.
+            </li>
+          </ol>
+          <p className="setup-warn">
+            It also closes a live hole: until it runs, any employee can set
+            their own role to admin, and the add-employee API trusts that
+            column.
+          </p>
+          <button className="btn-primary" onClick={refresh}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="page">
+    <div className="page page-wide">
       <header className="page-head">
         <h1>Scheduling</h1>
         <p className="page-sub">

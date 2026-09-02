@@ -1,47 +1,181 @@
 /* ---------------------------------------------------------------
+   Tailwind, minus Preflight.
+
+   Preflight is Tailwind's base reset. This app was fully hand-styled
+   before Tailwind arrived — it sets its own box-sizing, heading sizes,
+   button and paragraph styles — so dropping a second reset underneath
+   all of that would quietly restyle things nobody asked to change.
+   Importing theme + utilities gives every utility class without
+   touching a single existing element.
+
+   Once the hand-written CSS in App.css is gone, add:
+     @import "tailwindcss/preflight.css" layer(base);
+   --------------------------------------------------------------- */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* ---------------------------------------------------------------
    Design tokens — the single source of truth for the whole app.
-   Warm cream theme. Nothing hardcodes a hex outside this file.
+   Violet-tinted surfaces, solid violet accent. No gradients.
+   Nothing hardcodes a hex outside this file.
+
+   These live in Tailwind's own namespaces (--color-*, --radius-*,
+   --shadow-*), which is what makes each one a utility class:
+   bg-surface-2, text-accent, border-border-strong, rounded-pill,
+   shadow-float. The :root block further down re-exports every value
+   under the plain name the existing stylesheet already uses, so
+   `var(--accent)` and `text-accent` resolve to the same hex.
+   --------------------------------------------------------------- */
+@theme {
+  /* Surfaces, furthest back to closest. The canvas carries a real violet
+     tint rather than being neutral grey — it is the difference between
+     "an internal tool" and "a page nobody chose the colour of". The card
+     stays pure white so it lifts cleanly off that tint. */
+  --color-surface-0: #f4f2fd;
+  --color-surface-1: #fbfaff;
+  --color-surface-2: #ffffff;
+  --color-surface-3: #eeebfa;
+
+  /* The one dark surface: the clock-out button and anything that has to
+     read as the heavy action on the page. */
+  --color-surface-inverse: #2b1b52;
+  --color-surface-inverse-hover: #3b2570;
+
+  --color-border: #e6e1f7;
+  --color-border-strong: #cec5ee;
+
+  /* Ink carries a trace of the violet too, so text does not read as a
+     cold grey dropped onto a warm page. */
+  --color-ink: #1b1236; /* 16.4:1 on card */
+  --color-ink-secondary: #4a4266; /* 8.0:1 — body copy, values */
+  --color-ink-muted: #6f6790; /* 5.1:1 — labels, captions */
+  --color-ink-inverse: #ffffff;
+
+  --color-accent: #6d28d9; /* violet, 7.1:1 with white text */
+  --color-accent-hover: #5b21b6;
+  --color-accent-soft: #f1ebfe;
+  /* One step brighter than --accent, for where two accent surfaces sit
+     together and need telling apart — never as a blend, since nothing
+     in this app uses gradients. */
+  --color-accent-bright: #7c3aed;
+
+  /* UI intent colours — buttons, links, destructive actions. Each is
+     dark enough to be read as text on a card, which the soft variant
+     beside it is not. */
+  --color-success: #047857;
+  --color-success-soft: #d1fae5;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+
+  /* Status colours for DATA marks (calendar cells, matrix cells, stat
+     dots) are a separate, reserved set — never reused as a UI accent.
+     Every one carries white text somewhere, so all six clear 5:1
+     against white rather than the 3:1 a plain swatch would need:
+       good 5.5  warn 5.2  bad 6.7  leave 6.9  ob 6.0  holiday 6.0
+     Six saturated hues — teal / orange / red / purple / sky / pink —
+     spread far enough apart to stay separable under protanopia. Purple
+     sits clear of the violet accent so an active nav item never reads
+     as a leave day. No cell relies on colour alone: each prints a
+     letter and carries a title. */
+  --color-status-good: #0f766e;
+  --color-status-warn: #c2410c;
+  --color-status-bad: #b91c1c;
+  --color-status-leave: #7e22ce;
+  --color-status-ob: #0369a1;
+  --color-status-holiday: #be185d;
+
+  /* Overlays. The scrim dims the page behind a dialog; the glass pair is
+     the translucent login panel and its highlight edge; the wash is the
+     flat violet layer over the login photo that keeps the panel legible
+     wherever the image happens to be bright. */
+  --color-scrim: rgb(27 18 54 / 0.5);
+  --color-glass: rgb(255 255 255 / 0.92);
+  --color-glass-border: rgb(255 255 255 / 0.7);
+  --color-hairline-on-dark: rgb(255 255 255 / 0.2);
+  --color-hero-wash: rgb(45 16 96 / 0.56);
+
+  /* Rounder than the usual 8/12/16. Pills and soft cards are most of
+     what makes an interface feel approachable rather than clerical.
+     These deliberately replace Tailwind's defaults, so `rounded-sm`
+     means this app's small radius, not 0.25rem. */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* Cards sit flat on hairline borders; these are for things that
+     genuinely float — menus, dialogs, tooltips — plus the coloured glow
+     under the primary button, tinted to the violet it sits under rather
+     than being a neutral drop shadow. */
+  --shadow-float: 0 16px 40px rgb(76 29 149 / 0.18);
+  --shadow-sm: 0 4px 14px rgb(76 29 149 / 0.12);
+  --shadow-accent: 0 6px 18px rgb(124 58 237 / 0.34);
+  --shadow-accent-lift: 0 10px 24px rgb(124 58 237 / 0.42);
+
+  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+}
+
+/* ---------------------------------------------------------------
+   Legacy aliases.
+
+   Every name the hand-written stylesheet already uses, pointing at the
+   @theme value above. One source of truth, two spellings — so a
+   component can move to utilities without its neighbours in App.css
+   changing colour on the way.
    --------------------------------------------------------------- */
 :root {
-  /* Surfaces, furthest back to closest. Warm greys, never neutral — a
-     pure #fff card on cream reads as a hole punched in the page. */
-  --surface-0: #f4efe4; /* app background */
-  --surface-1: #faf7f0; /* sidebar */
-  --surface-2: #fffdf8; /* cards, panels */
-  --surface-3: #efe8da; /* inputs, hover, empty cells */
+  --surface-0: var(--color-surface-0);
+  --surface-1: var(--color-surface-1);
+  --surface-2: var(--color-surface-2);
+  --surface-3: var(--color-surface-3);
+  --surface-inverse: var(--color-surface-inverse);
+  --surface-inverse-hover: var(--color-surface-inverse-hover);
 
-  --border: #e7ddca; /* hairline between surfaces */
-  --border-strong: #d5c8b0; /* input outlines */
+  --border: var(--color-border);
+  --border-strong: var(--color-border-strong);
 
-  --text: #3a3129; /* 12.4:1 on card */
-  --text-secondary: #6b6154; /* 6.1:1 — body copy, values */
-  --text-muted: #948779; /* 3.6:1 — labels, captions only */
-  --text-inverse: #fffdf8;
+  --text: var(--color-ink);
+  --text-secondary: var(--color-ink-secondary);
+  --text-muted: var(--color-ink-muted);
+  --text-inverse: var(--color-ink-inverse);
 
-  --accent: #b45f3f; /* terracotta, 4.6:1 with white text */
-  --accent-hover: #994e32;
-  --accent-soft: #f6e7de;
+  --accent: var(--color-accent);
+  --accent-hover: var(--color-accent-hover);
+  --accent-soft: var(--color-accent-soft);
+  --accent-bright: var(--color-accent-bright);
 
-  /* UI intent colours — buttons, links, destructive actions. */
-  --success: #1a7f37;
-  --warning: #b8860b;
-  --danger: #b3261e;
-  --danger-soft: #f9e5e3;
+  --success: var(--color-success);
+  --success-soft: var(--color-success-soft);
+  --warning: var(--color-warning);
+  --warning-soft: var(--color-warning-soft);
+  --danger: var(--color-danger);
+  --danger-soft: var(--color-danger-soft);
 
-  /* Status colours for DATA marks (calendar cells, stat dots) are a
-     separate, reserved set — never reused as a UI accent. Validated
-     against the card surface #fffdf8 in light mode: protan separation
-     ΔE 9.6, normal-vision 21.9, lightness band and chroma floor pass.
-     Amber sits at 2.93:1, just under 3:1, which is why every use pairs
-     it with a visible label and a glyph — colour is never the only
-     channel. The previous green/yellow measured ΔE 4.2 under
-     protanopia: effectively identical for red-weak viewers. */
-  --status-good: #1a7f37;
-  --status-warn: #c8890a;
-  --status-bad: #b3261e;
+  --status-good: var(--color-status-good);
+  --status-warn: var(--color-status-warn);
+  --status-bad: var(--color-status-bad);
+  --status-leave: var(--color-status-leave);
+  --status-ob: var(--color-status-ob);
+  --status-holiday: var(--color-status-holiday);
+
+  --scrim: var(--color-scrim);
+  --glass: var(--color-glass);
+  --glass-border: var(--color-glass-border);
+  --hairline-on-dark: var(--color-hairline-on-dark);
+  --hero-wash: var(--color-hero-wash);
+
+  --sans: var(--font-sans);
+  --mono: var(--font-mono);
 
   /* Spacing scale — every gap and pad in the app comes from here, so
-     vertical rhythm stays consistent instead of drifting per-component. */
+     vertical rhythm stays consistent instead of drifting per-component.
+     Not mapped into @theme: Tailwind's own scale already lands on the
+     same pixels (p-1 = 4px … p-4 = 16px), so utilities and these agree
+     without a second set of names to keep in sync. */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -50,20 +184,14 @@
   --sp-6: 32px;
   --sp-7: 48px;
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-
-  /* One elevation only. Cards sit flat on hairline borders; the shadow
-     is reserved for things that genuinely float above the page. */
-  --shadow-float: 0 12px 40px rgba(58, 44, 28, 0.24);
-
   --sidebar-w: 232px;
 
-  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Content column. The wide variant is for pages that are mostly
+     table — Employees and the attendance matrix. */
+  --page-w: 1040px;
+  --page-w-wide: 1240px;
 
-  font: 15px/1.5 var(--sans);
+  font: 15px/1.5 var(--font-sans);
   color-scheme: light;
   color: var(--text);
   background: var(--surface-0);
@@ -96,14 +224,14 @@ h1,
 h2,
 h3 {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 
 h1 {
-  font-size: 1.5rem;
+  font-size: 1.7rem;
 }
 h2 {
   font-size: 1.15rem;

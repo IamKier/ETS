@@ -11,7 +11,7 @@ const DEV_PASSWORD = import.meta.env.VITE_DEV_PASSWORD;
 const DEV_BYPASS = import.meta.env.DEV && Boolean(DEV_PASSWORD);
 
 const DEV_ACCOUNTS = [
-  { email: "test@ets-demo.com", name: "Test Employee", role: "hr" },
+  { email: "it.admin@ets-demo.com", name: "IT Admin", role: "admin" },
   { email: "ana.cruz@ets-demo.com", name: "Ana Cruz", role: "hr" },
   { email: "maria.santos@ets-demo.com", name: "Maria Santos", role: "employee" },
   { email: "ben.reyes@ets-demo.com", name: "Ben Reyes", role: "employee" },

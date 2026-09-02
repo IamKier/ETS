@@ -5,36 +5,56 @@ import {
   ClipboardCheck,
   CalendarClock,
   CalendarRange,
-  CircleUser,
   UsersRound,
-  LogOut,
+  Contact,
+  Grid3x3,
 } from "lucide-react";
 import DashboardPage from "./src/pages/DashboardPage";
 import HRDashboard from "./src/pages/HRDashboard";
-import UserPage from "./src/pages/UserPage";
+import EmployeesPage from "./src/pages/EmployeesPage";
+import AttendanceMatrixPage from "./src/pages/AttendanceMatrixPage";
+import SettingsPage from "./src/pages/SettingsPage";
 import RequestsPage from "./src/pages/RequestsPage";
 import SchedulePage from "./src/pages/SchedulePage";
 import SchedulingPage from "./src/pages/SchedulingPage";
 import ApprovalsPage from "./src/pages/ApprovalsPage";
 import LoginPage from "./src/pages/LoginPage";
 import UpdatePasswordPage from "./src/pages/UpdatePasswordPage";
+import AccountMenu from "./src/components/AccountMenu";
 import { supabase } from "./supabaseClient";
 import "./App.css";
 
-const NAV = [
-  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "requests", label: "My requests", icon: CalendarDays },
-  { key: "schedule", label: "My schedule", icon: CalendarClock },
-  { key: "approvals", label: "Approvals", icon: ClipboardCheck, hrOnly: true },
-  { key: "user", label: "My profile", icon: CircleUser },
-  { key: "hr", label: "Team", icon: UsersRound, hrOnly: true },
+// Grouped rather than one flat list: with the HR pages added, eight
+// undifferentiated items made "my own timesheet" and "everyone else's"
+// look like the same kind of thing. The Manage group only renders for HR,
+// so an employee still sees a plain three-item sidebar with no empty
+// heading above it.
+const NAV_GROUPS = [
   {
-    key: "scheduling",
-    label: "Scheduling",
-    icon: CalendarRange,
+    label: "You",
+    items: [
+      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { key: "requests", label: "My requests", icon: CalendarDays },
+      { key: "schedule", label: "My schedule", icon: CalendarClock },
+    ],
+  },
+  {
+    label: "Manage",
     hrOnly: true,
+    items: [
+      { key: "approvals", label: "Approvals", icon: ClipboardCheck },
+      { key: "hr", label: "Team", icon: UsersRound },
+      { key: "employees", label: "Employees", icon: Contact },
+      { key: "matrix", label: "Attendance matrix", icon: Grid3x3 },
+      { key: "scheduling", label: "Scheduling", icon: CalendarRange },
+    ],
   },
 ];
+
+// Flattened once, so the key lookups below stay as cheap as they were.
+const NAV = NAV_GROUPS.flatMap((group) =>
+  group.items.map((item) => ({ ...item, hrOnly: group.hrOnly === true })),
+);
 
 // Which page is open survives a reload. localStorage rather than the URL
 // hash, because supabase-js parses its recovery token out of the hash
@@ -72,17 +92,13 @@ function clearUI() {
   }
 }
 
-const isNavKey = (key) => NAV.some((item) => item.key === key);
-const isHROnly = (key) => NAV.some((item) => item.key === key && item.hrOnly);
+// Reachable, but deliberately not in the sidebar list: settings opens from
+// the account block at the bottom, which is where people look for it.
+const OFF_NAV = ["settings"];
 
-function initials(name, email) {
-  const source = (name || "").trim();
-  if (source) {
-    const parts = source.split(/\s+/);
-    return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
-  }
-  return (email || "?").slice(0, 2).toUpperCase();
-}
+const isNavKey = (key) =>
+  OFF_NAV.includes(key) || NAV.some((item) => item.key === key);
+const isHROnly = (key) => NAV.some((item) => item.key === key && item.hrOnly);
 
 function App() {
   // Validated on the way in: a stored key from an older build, or one
@@ -134,24 +150,33 @@ function App() {
     // next sign-in refetches under its own userId.
     if (!userId) return;
     let cancelled = false;
-    supabase
-      .from("employees")
-      .select(
+
+    const read = (columns) =>
+      supabase.from("employees").select(columns).eq("id", userId).single();
+
+    // shift_id and rest_days only exist once schedule.sql has been applied.
+    // Postgres rejects the whole select for one unknown column (42703), so
+    // without this fallback the profile lands as null for every user — and
+    // a null profile means role is unknown, which hides every HR tab from
+    // the people who are supposed to see them.
+    (async () => {
+      let { data, error } = await read(
         "full_name, role, leave_quota, shift_start, start_date, shift_id, rest_days",
-      )
-      .eq("id", userId)
-      .single()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setProfile(data ?? null);
-        setProfileOwner(userId);
-      });
+      );
+      if (error?.code === "42703") {
+        ({ data } = await read(
+          "full_name, role, leave_quota, shift_start, start_date",
+        ));
+      }
+      if (cancelled) return;
+      setProfile(data ?? null);
+      setProfileOwner(userId);
+    })();
+
     return () => {
       cancelled = true;
     };
   }, [userId]);
-
-
 
   useEffect(() => {
     writeUI({ employeeView });
@@ -167,9 +192,8 @@ function App() {
   // checking before the profile lands would knock every HR user off
   // Approvals on every refresh, because for that first moment isHR is
   // false for everyone.
-  const page = profileLoaded && isHROnly(storedPage) && !isHR
-    ? "dashboard"
-    : storedPage;
+  const page =
+    profileLoaded && isHROnly(storedPage) && !isHR ? "dashboard" : storedPage;
 
   // Persisting the resolved page, not the requested one, so a fallback is
   // written through instead of being re-derived on every future load.
@@ -200,6 +224,18 @@ function App() {
 
   const email = session.user.email;
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    // Otherwise the next person to sign in on this browser lands on
+    // whatever page the last one left open.
+    clearUI();
+    setPage("dashboard");
+    setEmployeeView(false);
+    setProfile(null);
+    setProfileOwner(null);
+    setSession(null);
+  };
+
   // An HR page restored from storage renders nothing until the role is
   // confirmed. Saying so beats a blank panel that looks like a failure.
   const awaitingRole = isHROnly(page) && !profileLoaded;
@@ -213,20 +249,29 @@ function App() {
         </div>
 
         <nav className="nav">
-          {NAV.filter((item) => !item.hrOnly || showHR).map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.key}
-                className={`nav-item${page === item.key ? " active" : ""}`}
-                onClick={() => setPage(item.key)}
-                aria-current={page === item.key ? "page" : undefined}
-              >
-                <Icon size={17} strokeWidth={2} />
-                {item.label}
-              </button>
-            );
-          })}
+          {NAV_GROUPS.filter((group) => !group.hrOnly || showHR).map(
+            (group) => (
+              <div className="nav-group" key={group.label}>
+                {/* An employee sees one group, so labelling it would be
+                    a heading over the only thing on screen. */}
+                {showHR && <p className="eyebrow nav-heading">{group.label}</p>}
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.key}
+                      className={`nav-item${page === item.key ? " active" : ""}`}
+                      onClick={() => setPage(item.key)}
+                      aria-current={page === item.key ? "page" : undefined}
+                    >
+                      <Icon size={17} strokeWidth={2} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ),
+          )}
         </nav>
 
         {isHR && (
@@ -240,39 +285,19 @@ function App() {
             <span className="switch" aria-hidden="true" />
           </label>
         )}
-
-        <div className="account">
-          <span className="avatar" aria-hidden="true">
-            {initials(profile?.full_name, email)}
-          </span>
-          <span className="account-text">
-            <span className="account-name">
-              {profile?.full_name || email.split("@")[0]}
-            </span>
-            <span className="account-role">{profile?.role || "employee"}</span>
-          </span>
-          <button
-            className="icon-btn"
-            title="Sign out"
-            aria-label="Sign out"
-            onClick={async () => {
-              await supabase.auth.signOut();
-              // Otherwise the next person to sign in on this browser lands
-              // on whatever page the last one left open.
-              clearUI();
-              setPage("dashboard");
-              setEmployeeView(false);
-              setProfile(null);
-              setProfileOwner(null);
-              setSession(null);
-            }}
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
       </aside>
 
       <main className="main-content">
+        <header className="topbar">
+          <AccountMenu
+            email={email}
+            profile={profile}
+            active={page === "settings"}
+            onOpenSettings={() => setPage("settings")}
+            onSignOut={handleSignOut}
+          />
+        </header>
+
         {awaitingRole ? (
           <div className="page">
             <div className="entries-empty">Loading...</div>
@@ -287,8 +312,21 @@ function App() {
             )}
             {page === "schedule" && <SchedulePage profile={profile} />}
             {page === "approvals" && showHR && <ApprovalsPage />}
-            {page === "user" && <UserPage email={email} profile={profile} />}
+            {page === "settings" && (
+              <SettingsPage
+                email={email}
+                profile={profile}
+                // Patched in place rather than refetched: the header menu
+                // reads the same object, so without this your old name sits
+                // in the corner until the next reload.
+                onProfileChange={(patch) =>
+                  setProfile((p) => ({ ...(p ?? {}), ...patch }))
+                }
+              />
+            )}
             {page === "hr" && showHR && <HRDashboard />}
+            {page === "employees" && showHR && <EmployeesPage />}
+            {page === "matrix" && showHR && <AttendanceMatrixPage />}
             {page === "scheduling" && showHR && <SchedulingPage />}
           </>
         )}
