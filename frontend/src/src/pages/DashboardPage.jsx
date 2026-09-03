@@ -4,7 +4,9 @@ import ClockSection from "../components/ClockSection";
 import CalendarSection from "../components/CalendarSection";
 import StatRow from "../components/StatRow";
 import RecentEntries from "../components/RecentEntries";
+import ViewMenu from "../components/ViewMenu";
 import { spanByDay, toISODate } from "../lib/requests";
+import { PANELS, DEFAULT_VIEW, readView, writeView } from "../lib/dashboardView";
 import { DEFAULT_SCHEDULE, makeSchedule, shiftMinutes } from "../lib/schedule";
 
 const HOURS_PER_DAY = 8;
@@ -125,8 +127,16 @@ export default function DashboardPage({ userId, profile }) {
   // Bumped after a clock in/out so the calendar and stats refetch — they
   // used to keep showing pre-clock-in data until a manual reload.
   const [tick, setTick] = useState(0);
+  // Passed as the initialiser, not called: reading localStorage on every
+  // render would be wasted work for a value that only changes on click.
+  const [view, setView] = useState(readView);
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);
+
+  const changeView = useCallback((next) => {
+    setView(next);
+    writeView(next);
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -310,8 +320,16 @@ export default function DashboardPage({ userId, profile }) {
     month: "long",
   });
 
+  const { compact, panels } = view;
+  // The left column and the calendar each disappear on their own, so the
+  // two-column grid has to stand down to one rather than leave a 320px
+  // gutter where a hidden panel used to be.
+  const leftColumn = panels.clock || panels.entries;
+  const oneColumn = !leftColumn || !panels.calendar;
+  const allHidden = PANELS.every((panel) => !panels[panel.key]);
+
   return (
-    <div className="page">
+    <div className={`page${compact ? " is-compact" : ""}`}>
       <header className="page-head">
         <h1>
           {greet(now.getHours())}
@@ -329,54 +347,81 @@ export default function DashboardPage({ userId, profile }) {
 
       <div className="section-head">
         <span className="eyebrow">{viewingLabel}</span>
-        {!loading && current.workdays > 0 && (
-          <span className="section-note">
-            {current.workdays} working {current.workdays === 1 ? "day" : "days"}{" "}
-            so far
-            {current.onLeave > 0 && `, ${current.onLeave} on leave`}
-            {current.onOB > 0 && `, ${current.onOB} on OB`}
-            {current.holidays > 0 &&
-              `, ${current.holidays} ${current.holidays === 1 ? "holiday" : "holidays"}`}
-          </span>
-        )}
+        <div className="section-head-end">
+          {!loading && current.workdays > 0 && (
+            <span className="section-note">
+              {current.workdays} working{" "}
+              {current.workdays === 1 ? "day" : "days"} so far
+              {current.onLeave > 0 && `, ${current.onLeave} on leave`}
+              {current.onOB > 0 && `, ${current.onOB} on OB`}
+              {current.holidays > 0 &&
+                `, ${current.holidays} ${current.holidays === 1 ? "holiday" : "holidays"}`}
+            </span>
+          )}
+          <ViewMenu view={view} onChange={changeView} />
+        </div>
       </div>
 
-      <StatRow
-        stats={current}
-        previous={previous}
-        prevLabel={prevLabel}
-        loading={loading}
-      />
-
-      <div className="dash-grid">
-        <div className="dash-col">
-          <ClockSection
-            userId={userId}
-            shift={shift}
-            onChange={refresh}
-          />
-          <RecentEntries
-            rows={monthRows}
-            loading={loading}
-            userId={userId}
-            onChange={refresh}
-          />
-        </div>
-        <CalendarSection
-          year={year}
-          month={month}
-          byDay={current.byDay}
-          leaveByDay={monthLeave}
-          obByDay={monthOB}
-          schedule={schedule}
-          empStart={empStart}
-          canGoPrev={canGoPrev}
-          onPrev={goPrev}
-          onNext={goNext}
-          onToday={goToday}
+      {panels.stats && (
+        <StatRow
+          stats={current}
+          previous={previous}
+          prevLabel={prevLabel}
           loading={loading}
         />
+      )}
+
+      {/* Turning every panel off is a legitimate thing to want — a blank
+          page with no way back out of it is not. */}
+      {allHidden && (
+        <div className="dash-empty">
+          <p>Every panel is hidden.</p>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => changeView({ ...view, panels: DEFAULT_VIEW.panels })}
+          >
+            Show them again
+          </button>
+        </div>
+      )}
+
+      {!allHidden && (
+      <div className={`dash-grid${oneColumn ? " is-single" : ""}`}>
+        {leftColumn && (
+          <div className="dash-col">
+            {panels.clock && (
+              <ClockSection userId={userId} shift={shift} onChange={refresh} />
+            )}
+            {panels.entries && (
+              <RecentEntries
+                rows={monthRows}
+                loading={loading}
+                userId={userId}
+                onChange={refresh}
+                compact={compact}
+              />
+            )}
+          </div>
+        )}
+        {panels.calendar && (
+          <CalendarSection
+            year={year}
+            month={month}
+            byDay={current.byDay}
+            leaveByDay={monthLeave}
+            obByDay={monthOB}
+            schedule={schedule}
+            empStart={empStart}
+            canGoPrev={canGoPrev}
+            onPrev={goPrev}
+            onNext={goNext}
+            onToday={goToday}
+            loading={loading}
+          />
+        )}
       </div>
+      )}
     </div>
   );
 }

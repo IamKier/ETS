@@ -3090,3 +3090,209 @@
     transform: none;
   }
 }
+
+/* ---------------------------------------------------------------
+   Dashboard view control — hide panels, or tighten the ones kept
+   --------------------------------------------------------------- */
+
+/* The eyebrow keeps the left, the note and the trigger share the right.
+   Wrapping matters: on a narrow window the working-days note is the part
+   that gives way, never the control. */
+.section-head-end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.view-anchor {
+  position: relative;
+  flex: none;
+}
+
+.view-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.view-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.view-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.view-btn.is-open {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.view-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 20px;
+  padding: 1px 7px;
+}
+
+.view-menu {
+  position: absolute;
+  top: calc(100% + var(--sp-2));
+  right: 0;
+  min-width: 208px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-1);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+}
+
+.view-menu-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: var(--sp-2) var(--sp-2) 4px;
+  margin: 0;
+}
+
+/* First label sits flush against the menu's own padding. */
+.view-menu-label:first-child {
+  padding-top: 4px;
+}
+
+.view-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 8px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.86rem;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.view-menu button:hover,
+.view-menu button:focus-visible {
+  background: var(--surface-3);
+  outline: none;
+}
+
+/* Pushes the tick to the far edge without a spacer element. */
+.view-check {
+  margin-left: auto;
+  color: var(--accent);
+}
+
+.view-box {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-inverse);
+}
+
+.view-box.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.dash-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-4);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  background: var(--surface-1);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.dash-empty p {
+  margin: 0;
+}
+
+/* One panel left standing should use the full width rather than sit in a
+   320px column with dead space beside it. */
+.dash-grid.is-single {
+  grid-template-columns: 1fr;
+}
+
+/* ---------------------------------------------------------------
+   Compact density
+
+   Scoped to .page.is-compact so every rule here is inert on the
+   default view and nothing needs a matching "comfortable" override.
+   --------------------------------------------------------------- */
+.page.is-compact .page-head {
+  margin-bottom: var(--sp-3);
+}
+
+.page.is-compact .stat-row {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.page.is-compact .stat-tile {
+  padding: var(--sp-3);
+}
+
+.page.is-compact .stat-value {
+  font-size: 1.4rem;
+}
+
+/* The month-over-month deltas and the hours meter are the first things to
+   go: they are context, and compact is a request for less of it. */
+.page.is-compact .stat-foot,
+.page.is-compact .delta {
+  display: none;
+}
+
+.page.is-compact .dash-grid,
+.page.is-compact .dash-col {
+  gap: var(--sp-3);
+}
+
+.page.is-compact .card-pad,
+.page.is-compact .clock-section,
+.page.is-compact .calendar-section {
+  padding: var(--sp-4);
+}
+
+.page.is-compact .clock-time {
+  font-size: 2rem;
+}

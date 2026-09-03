@@ -3,6 +3,10 @@ import { PencilLine, Plus } from "lucide-react";
 import RequestDialog from "./RequestDialog";
 
 const LIMIT = 5;
+// Compact trades the two oldest rows for the vertical space, which is the
+// whole point of asking for it — the full month is a click away on the
+// calendar either way.
+const COMPACT_LIMIT = 3;
 
 function time(iso) {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -18,7 +22,13 @@ function duration(a, b) {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-export default function RecentEntries({ rows, loading, userId, onChange }) {
+export default function RecentEntries({
+  rows,
+  loading,
+  userId,
+  onChange,
+  compact = false,
+}) {
   // null = closed. { entry } with entry null means "add a day that was
   // never clocked", which the dialog and the approval path both handle.
   const [correcting, setCorrecting] = useState(null);
@@ -27,7 +37,7 @@ export default function RecentEntries({ rows, loading, userId, onChange }) {
   // actual in/out times were only reachable by hovering a cell.
   const recent = [...rows]
     .sort((a, b) => new Date(b.clock_in) - new Date(a.clock_in))
-    .slice(0, LIMIT);
+    .slice(0, compact ? COMPACT_LIMIT : LIMIT);
 
   return (
     <section className="card entries">
